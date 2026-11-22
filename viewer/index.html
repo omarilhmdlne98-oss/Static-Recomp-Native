@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Static-Recomp-Native — WebGL / Three.js Asset & Shader Previewer</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1018; color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif; }
+    #viewport { width: 100vw; height: 100vh; display: block; }
+    .panel {
+      position: fixed; top: 14px; left: 14px; width: 310px;
+      background: rgba(15, 22, 34, 0.86); border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 12px; padding: 14px; backdrop-filter: blur(6px);
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .panel h1 { margin: 0; font-size: 1rem; color: #38bdf8; letter-spacing: 0.6px; }
+    .row { display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; color: #94a3b8; }
+    select, input[type="range"] { background: #0a0f16; color: #f8fafc; border: 1px solid #2b3a4f; border-radius: 6px; padding: 4px 6px; }
+    .badge { font-size: 0.72rem; padding: 3px 7px; border-radius: 99px; background: rgba(56, 189, 248, 0.16); color: #38bdf8; }
+  </style>
+</head>
+<body>
+  <canvas id="viewport"></canvas>
+  <div class="panel">
+    <h1>Static-Recomp Asset &amp; Shader Viewer</h1>
+    <div class="row"><span>RHI Target</span><span class="badge">Vulkan / SPIR-V (2GB VRAM)</span></div>
+    <div class="row">
+      <label for="mesh-select">Preview Mesh</label>
+      <select id="mesh-select">
+        <option value="torus">Shader Calibration Knot</option>
+        <option value="box">Recompiled Crate Stub</option>
+        <option value="sphere">PBR Material Sphere</option>
+      </select>
+    </div>
+    <div class="row">
+      <label for="rough-slider">Roughness</label>
+      <input id="rough-slider" type="range" min="0.05" max="1" step="0.05" value="0.35" />
+    </div>
+    <div class="row">
+      <label for="metal-slider">Metallic</label>
+      <input id="metal-slider" type="range" min="0" max="1" step="0.05" value="0.65" />
+    </div>
+    <div class="row">
+      <label for="wire-toggle">Wireframe Topology</label>
+      <input id="wire-toggle" type="checkbox" />
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.170.0/build/three.module.js';
+
+    const canvas = document.getElementById('viewport');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0b1018);
+    const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 1.4, 4.2);
+
+    scene.add(new THREE.HemisphereLight(0x93c5fd, 0x1e293b, 0.9));
+    const sun = new THREE.DirectionalLight(0xfff1dc, 1.8);
+    sun.position.set(5, 8, 6);
+    scene.add(sun);
+
+    const grid = new THREE.GridHelper(16, 16, 0x38bdf8, 0x1e293b);
+    grid.position.y = -1.2;
+    scene.add(grid);
+
+    const mat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.35, metalness: 0.65 });
+    const geometries = {
+      torus: new THREE.TorusKnotGeometry(0.85, 0.28, 128, 24),
+      box: new THREE.BoxGeometry(1.5, 1.5, 1.5, 4, 4, 4),
+      sphere: new THREE.SphereGeometry(1.05, 48, 32)
+    };
+    let mesh = new THREE.Mesh(geometries.torus, mat);
+    scene.add(mesh);
+
+    document.getElementById('mesh-select').addEventListener('change', (e) => {
+      mesh.geometry = geometries[e.target.value];
+    });
+    document.getElementById('rough-slider').addEventListener('input', (e) => {
+      mat.roughness = Number(e.target.value);
+    });
+    document.getElementById('metal-slider').addEventListener('input', (e) => {
+      mat.metalness = Number(e.target.value);
+    });
+    document.getElementById('wire-toggle').addEventListener('change', (e) => {
+      mat.wireframe = e.target.checked;
+    });
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      mesh.rotation.y += 0.008;
+      mesh.rotation.x += 0.004;
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "title": "Synthetic Static-Recomp Asset Manifest",
+  "target_vram_mb": 2048,
+  "textures": [
+    { "name": "env_concrete_albedo", "width": 1024, "height": 1024, "format": "BC7", "mipmapped": true },
+    { "name": "env_steel_normal", "width": 1024, "height": 1024, "format": "BC5", "mipmapped": true },
+    { "name": "char_operator_diffuse", "width": 1024, "height": 1024, "format": "BC7", "mipmapped": true },
+    { "name": "ui_hud_atlas", "width": 512, "height": 512, "format": "RGBA8", "mipmapped": false }
+  ],
+  "meshes": [
+    { "name": "arena_sector_01", "vertices": 48200, "triangles": 31400 },
+    { "name": "operator_rig_lod0", "vertices": 14600, "triangles": 9800 }
+  ]
+}

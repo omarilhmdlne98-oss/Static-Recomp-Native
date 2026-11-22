@@ -1,0 +1,31 @@
+# Build outputs
+build/
+out/
+*.exe
+*.obj
+*.pdb
+*.lib
+*.dll
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# User-supplied game binaries & extracted copyrighted assets (NEVER commit)
+roms/
+dumps/
+*.xex
+*.z64
+*.n64
+*.v64
+*.iso
+*.xiso
+*.elf
+*.bin
+*.spv
+
+# OS / IDE
+.DS_Store
+.vscode/
+.vs/

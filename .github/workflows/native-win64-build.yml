@@ -1,0 +1,54 @@
+name: Native Win64 C++20 Build (CMake + MSVC)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-win64:
+    name: Build StaticRecompNative.exe (Windows x64 MSVC)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate Python Recompilation, Shader & Asset Tools
+        shell: pwsh
+        run: |
+          python tools/recomp_pipeline.py --self-test
+          python shaders/spirv_translator.py --validate
+          python assets/asset_inspector.py --manifest assets/manifest.example.json --vram-mb 2048
+
+      - name: Configure CMake (MSVC x64)
+        shell: pwsh
+        run: |
+          cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+
+      - name: Build StaticRecompNative (Release)
+        shell: pwsh
+        run: |
+          cmake --build build --config Release --parallel
+
+      - name: Smoke Test Native Win64 Executable (Headless)
+        shell: pwsh
+        run: |
+          .\build\Release\StaticRecompNative.exe --headless --frames 10 --vram-mb 2048
+
+      - name: Upload Native Win64 Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StaticRecompNative-Win64-x64
+          path: |
+            build/Release/StaticRecompNative.exe
+            generated_code/RecompStubs.h
+            shaders/*.glsl
+          retention-days: 14
