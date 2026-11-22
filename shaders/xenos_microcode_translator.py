@@ -45,6 +45,7 @@ def get_battlefield_presets() -> List[PBRMaterialPreset]:
     return [
         PBRMaterialPreset("weathered_concrete", "Weathered Tactical Concrete", "#6e7782", 0.86, 0.06, 0.14, 0.92),
         PBRMaterialPreset("brushed_steel", "Brushed Ballistic Steel", "#4c5868", 0.34, 0.84, 0.32, 0.85),
+        PBRMaterialPreset("catwalk_grate", "Perforated Steel Catwalk Grate", "#3e4856", 0.40, 0.86, 0.36, 0.86, "#38bdf8"),
         PBRMaterialPreset("overwatch_alloy", "Overwatch Tower Alloy", "#364150", 0.38, 0.78, 0.38, 0.88, "#38bdf8"),
         PBRMaterialPreset("ballistic_bunker", "Reinforced Ballistic Bunker", "#586068", 0.76, 0.24, 0.18, 0.90),
         PBRMaterialPreset("vault_core", "Armored Vault Core", "#2b3544", 0.28, 0.88, 0.45, 0.82, "#2dd4bf"),
@@ -53,10 +54,12 @@ def get_battlefield_presets() -> List[PBRMaterialPreset]:
 
 def get_tactical_structures() -> List[TacticalStructureSpec]:
     return [
-        TacticalStructureSpec("overwatch_tower", "Armored Overwatch Guard Tower", "VerticalSightline", 3.6, 5.8, 3.6, "overwatch_alloy"),
+        TacticalStructureSpec("overwatch_tower", "Armored Overwatch Guard Tower", "VerticalSightline", 4.0, 4.2, 4.0, "overwatch_alloy"),
+        TacticalStructureSpec("perimeter_catwalk", "Perimeter Steel Catwalk Loop (x4)", "UpperCatwalk", 35.0, 0.28, 3.2, "catwalk_grate"),
+        TacticalStructureSpec("central_cross_bridge", "Vault Central Cross-Bridge (x2)", "CrossBridge", 13.1, 0.26, 3.0, "catwalk_grate"),
+        TacticalStructureSpec("vault_overpass", "Armored Vault Overpass Ring", "OverpassDeck", 9.2, 0.28, 9.2, "brushed_steel"),
+        TacticalStructureSpec("inclined_ramp", "Smooth 21.6-deg Steel Access Ramp (x4)", "InclinedRamp", 2.8, 0.24, 11.4, "catwalk_grate"),
         TacticalStructureSpec("ballistic_bunker", "Reinforced Ballistic Shield Bunker", "MidLaneCover", 4.6, 1.85, 2.2, "ballistic_bunker"),
-        TacticalStructureSpec("steel_gantry", "Overhead Industrial Steel Gantry", "SkyBridge", 22.0, 0.45, 3.0, "brushed_steel"),
-        TacticalStructureSpec("sniper_catwalk", "Elevated Sniper Perch Deck", "HighGround", 18.0, 3.1, 4.2, "brushed_steel"),
     ]
 
 
