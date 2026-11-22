@@ -26,6 +26,7 @@ jobs:
         run: |
           python tools/recomp_pipeline.py --self-test
           python shaders/spirv_translator.py --validate
+          python shaders/xenos_microcode_translator.py
           python assets/asset_inspector.py --manifest assets/manifest.example.json --vram-mb 2048
 
       - name: Configure CMake (MSVC x64)

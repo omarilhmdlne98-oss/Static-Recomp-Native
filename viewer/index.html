@@ -3,48 +3,55 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Static-Recomp-Native — WebGL / Three.js Asset & Shader Previewer</title>
+  <title>Static-Recomp-Native — Weapon &amp; Battlefield PBR Inspector</title>
   <style>
     * { box-sizing: border-box; }
-    html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1018; color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #090e17; color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif; }
     #viewport { width: 100vw; height: 100vh; display: block; }
     .panel {
-      position: fixed; top: 14px; left: 14px; width: 310px;
-      background: rgba(15, 22, 34, 0.86); border: 1px solid rgba(56, 189, 248, 0.3);
-      border-radius: 12px; padding: 14px; backdrop-filter: blur(6px);
+      position: fixed; top: 14px; left: 14px; width: 330px;
+      background: rgba(13, 20, 31, 0.88); border: 1px solid rgba(56, 189, 248, 0.34);
+      border-radius: 12px; padding: 14px; backdrop-filter: blur(8px);
       display: flex; flex-direction: column; gap: 10px;
     }
     .panel h1 { margin: 0; font-size: 1rem; color: #38bdf8; letter-spacing: 0.6px; }
-    .row { display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; color: #94a3b8; }
+    .row { display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; color: #94a3b8; gap: 8px; }
     select, input[type="range"] { background: #0a0f16; color: #f8fafc; border: 1px solid #2b3a4f; border-radius: 6px; padding: 4px 6px; }
-    .badge { font-size: 0.72rem; padding: 3px 7px; border-radius: 99px; background: rgba(56, 189, 248, 0.16); color: #38bdf8; }
+    .badge { font-size: 0.72rem; padding: 3px 8px; border-radius: 99px; background: rgba(56, 189, 248, 0.16); color: #38bdf8; }
+    .telemetry {
+      font-family: ui-monospace, SFMono-Regular, monospace; font-size: 0.74rem; color: #cbd5e1;
+      background: rgba(7, 11, 18, 0.75); border: 1px solid #1e293b; border-radius: 8px; padding: 8px; line-height: 1.5;
+    }
   </style>
 </head>
 <body>
   <canvas id="viewport"></canvas>
   <div class="panel">
-    <h1>Static-Recomp Asset &amp; Shader Viewer</h1>
-    <div class="row"><span>RHI Target</span><span class="badge">Vulkan / SPIR-V (2GB VRAM)</span></div>
+    <h1>Leonida / XenonRecomp Asset Inspector</h1>
+    <div class="row"><span>Shader Profile</span><span class="badge">GLSL 450 &rarr; SPIR-V / 2GB VRAM</span></div>
     <div class="row">
-      <label for="mesh-select">Preview Mesh</label>
-      <select id="mesh-select">
-        <option value="torus">Shader Calibration Knot</option>
-        <option value="box">Recompiled Crate Stub</option>
-        <option value="sphere">PBR Material Sphere</option>
+      <label for="asset-select">Inspect Asset</label>
+      <select id="asset-select">
+        <option value="rifle">VX-47 Assault Rifle</option>
+        <option value="railgun">XR-9 Railgun</option>
+        <option value="shotgun">M-12 Heavy Shotgun</option>
+        <option value="tower">Overwatch Guard Tower</option>
+        <option value="bunker">Reinforced Ballistic Bunker</option>
       </select>
     </div>
     <div class="row">
-      <label for="rough-slider">Roughness</label>
-      <input id="rough-slider" type="range" min="0.05" max="1" step="0.05" value="0.35" />
+      <label for="rough-slider">PBR Roughness</label>
+      <input id="rough-slider" type="range" min="0.08" max="1" step="0.02" value="0.34" />
     </div>
     <div class="row">
-      <label for="metal-slider">Metallic</label>
-      <input id="metal-slider" type="range" min="0" max="1" step="0.05" value="0.65" />
+      <label for="metal-slider">PBR Metallic</label>
+      <input id="metal-slider" type="range" min="0" max="1" step="0.02" value="0.78" />
     </div>
     <div class="row">
       <label for="wire-toggle">Wireframe Topology</label>
       <input id="wire-toggle" type="checkbox" />
     </div>
+    <div class="telemetry" id="telemetry-box"></div>
   </div>
 
   <script type="module">
@@ -55,41 +62,104 @@
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0b1018);
-    const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 100);
-    camera.position.set(0, 1.4, 4.2);
+    scene.background = new THREE.Color(0x090e17);
+    const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.05, 100);
+    camera.position.set(0, 1.0, 2.8);
 
-    scene.add(new THREE.HemisphereLight(0x93c5fd, 0x1e293b, 0.9));
-    const sun = new THREE.DirectionalLight(0xfff1dc, 1.8);
+    scene.add(new THREE.HemisphereLight(0x93c5fd, 0x1e293b, 0.95));
+    const sun = new THREE.DirectionalLight(0xffebd2, 2.0);
     sun.position.set(5, 8, 6);
     scene.add(sun);
+    const rim = new THREE.DirectionalLight(0x38bdf8, 0.9);
+    rim.position.set(-5, 3, -5);
+    scene.add(rim);
 
     const grid = new THREE.GridHelper(16, 16, 0x38bdf8, 0x1e293b);
-    grid.position.y = -1.2;
+    grid.position.y = -0.9;
     scene.add(grid);
 
-    const mat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.35, metalness: 0.65 });
-    const geometries = {
-      torus: new THREE.TorusKnotGeometry(0.85, 0.28, 128, 24),
-      box: new THREE.BoxGeometry(1.5, 1.5, 1.5, 4, 4, 4),
-      sphere: new THREE.SphereGeometry(1.05, 48, 32)
-    };
-    let mesh = new THREE.Mesh(geometries.torus, mat);
-    scene.add(mesh);
+    const primaryMat = new THREE.MeshStandardMaterial({ color: 0x303b4a, roughness: 0.34, metalness: 0.78 });
+    const darkMat = new THREE.MeshStandardMaterial({ color: 0x141922, roughness: 0.72, metalness: 0.25 });
+    const accentMat = new THREE.MeshStandardMaterial({ color: 0x22d3ee, emissive: 0x22d3ee, emissiveIntensity: 2.2 });
 
-    document.getElementById('mesh-select').addEventListener('change', (e) => {
-      mesh.geometry = geometries[e.target.value];
-    });
-    document.getElementById('rough-slider').addEventListener('input', (e) => {
-      mat.roughness = Number(e.target.value);
-    });
-    document.getElementById('metal-slider').addEventListener('input', (e) => {
-      mat.metalness = Number(e.target.value);
-    });
+    const SPECS = {
+      rifle: 'VX-47 Assault Rifle\nMuzzle Vel: 120 m/s | Drop: 9.81 m/s²\nDMG: 24 (Head 2.2x = 52.8) | Mag: 30/150',
+      railgun: 'XR-9 Railgun\nMuzzle Vel: 260 m/s | Drop: 3.20 m/s²\nDMG: 68 (Head 2.2x = 149.6) | Mag: 6/30',
+      shotgun: 'M-12 Heavy Shotgun\nMuzzle Vel: 95 m/s | Pellets: 6\nDMG: 14x6 (Head 2.2x) | Mag: 8/40',
+      tower: 'Armored Overwatch Guard Tower\nPreset: overwatch_alloy | 3.6x5.8x3.6m\nRole: Corner Vertical Sightline & Beacon',
+      bunker: 'Reinforced Ballistic Shield Bunker\nPreset: ballistic_bunker | 4.6x1.85x2.2m\nRole: Mid-Lane Cover & Firing Port'
+    };
+
+    let activeGroup = new THREE.Group();
+    scene.add(activeGroup);
+
+    function buildAsset(id) {
+      scene.remove(activeGroup);
+      activeGroup = new THREE.Group();
+      const accentHex = id === 'railgun' ? 0xc084fc : (id === 'shotgun' ? 0xfb923c : 0x22d3ee);
+      accentMat.color.setHex(accentHex);
+      accentMat.emissive.setHex(accentHex);
+
+      if (id === 'rifle') {
+        activeGroup.add(new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.26, 1.05), primaryMat));
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.045, 0.72, 12), primaryMat);
+        barrel.rotation.x = Math.PI / 2; barrel.position.set(0, 0.04, -0.82);
+        const optic = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 0.28), darkMat);
+        optic.position.set(0, 0.2, -0.08);
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.04, 0.56), accentMat);
+        rail.position.set(0, 0.14, -0.42);
+        const mag = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.42, 0.18), darkMat);
+        mag.position.set(0, -0.28, -0.15); mag.rotation.x = 0.2;
+        activeGroup.add(barrel, optic, rail, mag);
+        camera.position.set(0, 0.7, 2.3);
+      } else if (id === 'railgun') {
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.28, 1.1), primaryMat);
+        const rTop = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 1.25), primaryMat); rTop.position.set(0, 0.1, -0.95);
+        const rBot = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 1.25), primaryMat); rBot.position.set(0, -0.06, -0.95);
+        const core = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 1.2), accentMat); core.position.set(0, 0.02, -0.92);
+        const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.65, 16), darkMat);
+        scope.rotation.x = Math.PI / 2; scope.position.set(0, 0.24, -0.12);
+        activeGroup.add(body, rTop, rBot, core, scope);
+        camera.position.set(0, 0.8, 2.8);
+      } else if (id === 'shotgun') {
+        const rec = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.26, 0.82), primaryMat);
+        const bbl = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.065, 1.1, 12), primaryMat);
+        bbl.rotation.x = Math.PI / 2; bbl.position.set(0, 0.06, -0.82);
+        const pump = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 0.48), darkMat); pump.position.set(0, -0.06, -0.76);
+        const sight = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.08, 0.2), accentMat); sight.position.set(0, 0.17, -0.1);
+        activeGroup.add(rec, bbl, pump, sight);
+        camera.position.set(0, 0.7, 2.4);
+      } else if (id === 'tower') {
+        for (const sx of [-0.65, 0.65]) for (const sz of [-0.65, 0.65]) {
+          const leg = new THREE.Mesh(new THREE.BoxGeometry(0.14, 2.2, 0.14), primaryMat);
+          leg.position.set(sx, 0.2, sz); activeGroup.add(leg);
+        }
+        const deck = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.18, 1.7), darkMat); deck.position.y = 1.25;
+        const shield = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.55, 0.12), primaryMat); shield.position.set(0, 1.6, 0.8);
+        const beacon = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.08, 0.08), accentMat); beacon.position.set(0, 1.92, 0.8);
+        activeGroup.add(deck, shield, beacon);
+        camera.position.set(0, 1.5, 4.2);
+      } else {
+        const base = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.85, 0.95), primaryMat);
+        const roof = new THREE.Mesh(new THREE.BoxGeometry(2.25, 0.16, 1.15), darkMat); roof.position.y = 0.72;
+        const slit = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.06, 0.1), accentMat); slit.position.set(0, 0.45, 0.5);
+        activeGroup.add(base, roof, slit);
+        camera.position.set(0, 1.0, 3.6);
+      }
+      scene.add(activeGroup);
+      document.getElementById('telemetry-box').textContent = SPECS[id];
+    }
+
+    buildAsset('rifle');
+    document.getElementById('asset-select').addEventListener('change', (e) => buildAsset(e.target.value));
+    document.getElementById('rough-slider').addEventListener('input', (e) => { primaryMat.roughness = Number(e.target.value); });
+    document.getElementById('metal-slider').addEventListener('input', (e) => { primaryMat.metalness = Number(e.target.value); });
     document.getElementById('wire-toggle').addEventListener('change', (e) => {
-      mat.wireframe = e.target.checked;
+      primaryMat.wireframe = e.target.checked;
+      darkMat.wireframe = e.target.checked;
     });
 
     window.addEventListener('resize', () => {
@@ -100,8 +170,8 @@
 
     function animate() {
       requestAnimationFrame(animate);
-      mesh.rotation.y += 0.008;
-      mesh.rotation.x += 0.004;
+      activeGroup.rotation.y += 0.009;
+      camera.lookAt(0, 0.25, 0);
       renderer.render(scene, camera);
     }
     animate();

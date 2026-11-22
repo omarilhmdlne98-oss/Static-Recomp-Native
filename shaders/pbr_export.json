@@ -1,0 +1,104 @@
+{
+  "pipeline": "Static-Recomp-Native (Leonida + XenonRecomp Shader Bridge)",
+  "translation_metrics": {
+    "source_profile": "Xenos/RAGE_SM30_IR",
+    "target_profile": "Vulkan_GLSL_450_SPIRV",
+    "alu_instructions": 3,
+    "tex_fetches": 1,
+    "vram_2gb_safe": true
+  },
+  "pbr_presets": [
+    {
+      "id": "weathered_concrete",
+      "name": "Weathered Tactical Concrete",
+      "base_color_hex": "#6e7782",
+      "roughness": 0.86,
+      "metallic": 0.06,
+      "rim_strength": 0.14,
+      "ao_strength": 0.92,
+      "emissive_hex": "#000000"
+    },
+    {
+      "id": "brushed_steel",
+      "name": "Brushed Ballistic Steel",
+      "base_color_hex": "#4c5868",
+      "roughness": 0.34,
+      "metallic": 0.84,
+      "rim_strength": 0.32,
+      "ao_strength": 0.85,
+      "emissive_hex": "#000000"
+    },
+    {
+      "id": "overwatch_alloy",
+      "name": "Overwatch Tower Alloy",
+      "base_color_hex": "#364150",
+      "roughness": 0.38,
+      "metallic": 0.78,
+      "rim_strength": 0.38,
+      "ao_strength": 0.88,
+      "emissive_hex": "#38bdf8"
+    },
+    {
+      "id": "ballistic_bunker",
+      "name": "Reinforced Ballistic Bunker",
+      "base_color_hex": "#586068",
+      "roughness": 0.76,
+      "metallic": 0.24,
+      "rim_strength": 0.18,
+      "ao_strength": 0.9,
+      "emissive_hex": "#000000"
+    },
+    {
+      "id": "vault_core",
+      "name": "Armored Vault Core",
+      "base_color_hex": "#2b3544",
+      "roughness": 0.28,
+      "metallic": 0.88,
+      "rim_strength": 0.45,
+      "ao_strength": 0.82,
+      "emissive_hex": "#2dd4bf"
+    }
+  ],
+  "tactical_structures": [
+    {
+      "id": "overwatch_tower",
+      "name": "Armored Overwatch Guard Tower",
+      "category": "VerticalSightline",
+      "width_m": 3.6,
+      "height_m": 5.8,
+      "depth_m": 3.6,
+      "material_preset": "overwatch_alloy",
+      "destructible": false
+    },
+    {
+      "id": "ballistic_bunker",
+      "name": "Reinforced Ballistic Shield Bunker",
+      "category": "MidLaneCover",
+      "width_m": 4.6,
+      "height_m": 1.85,
+      "depth_m": 2.2,
+      "material_preset": "ballistic_bunker",
+      "destructible": false
+    },
+    {
+      "id": "steel_gantry",
+      "name": "Overhead Industrial Steel Gantry",
+      "category": "SkyBridge",
+      "width_m": 22.0,
+      "height_m": 0.45,
+      "depth_m": 3.0,
+      "material_preset": "brushed_steel",
+      "destructible": false
+    },
+    {
+      "id": "sniper_catwalk",
+      "name": "Elevated Sniper Perch Deck",
+      "category": "HighGround",
+      "width_m": 18.0,
+      "height_m": 3.1,
+      "depth_m": 4.2,
+      "material_preset": "brushed_steel",
+      "destructible": false
+    }
+  ]
+}
