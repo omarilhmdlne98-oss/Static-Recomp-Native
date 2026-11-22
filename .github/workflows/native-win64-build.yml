@@ -21,11 +21,13 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Validate Python Recompilation, Shader & Asset Tools
+      - name: Validate Recompilation, Archive Unpacker, SPIR-V & Asset Tools
         shell: pwsh
         run: |
           python tools/recomp_pipeline.py --self-test
-          python shaders/spirv_translator.py --validate
+          python tools/archive_unpacker.py --self-test
+          python shaders/spirv_translator.py --self-test
+          python shaders/spirv_translator.py --out shaders/compiled
           python shaders/xenos_microcode_translator.py
           python assets/asset_inspector.py --manifest assets/manifest.example.json --vram-mb 2048
 
@@ -52,4 +54,6 @@ jobs:
             build/Release/StaticRecompNative.exe
             generated_code/RecompStubs.h
             shaders/*.glsl
+            shaders/compiled/*.spv
+            shaders/compiled/spirv_manifest.json
           retention-days: 14

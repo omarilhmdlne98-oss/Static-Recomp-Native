@@ -3,34 +3,34 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Static-Recomp-Native — Weapon &amp; Battlefield PBR Inspector</title>
+  <title>Static-Recomp-Native — Extracted 3D Model &amp; SPIR-V Shader Inspector</title>
   <style>
     * { box-sizing: border-box; }
     html, body { margin: 0; height: 100%; overflow: hidden; background: #090e17; color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif; }
     #viewport { width: 100vw; height: 100vh; display: block; }
     .panel {
-      position: fixed; top: 14px; left: 14px; width: 330px;
-      background: rgba(13, 20, 31, 0.88); border: 1px solid rgba(56, 189, 248, 0.34);
+      position: fixed; top: 14px; left: 14px; width: 350px; max-height: calc(100vh - 28px); overflow-y: auto;
+      background: rgba(13, 20, 31, 0.9); border: 1px solid rgba(56, 189, 248, 0.34);
       border-radius: 12px; padding: 14px; backdrop-filter: blur(8px);
-      display: flex; flex-direction: column; gap: 10px;
+      display: flex; flex-direction: column; gap: 9px;
     }
-    .panel h1 { margin: 0; font-size: 1rem; color: #38bdf8; letter-spacing: 0.6px; }
-    .row { display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; color: #94a3b8; gap: 8px; }
-    select, input[type="range"] { background: #0a0f16; color: #f8fafc; border: 1px solid #2b3a4f; border-radius: 6px; padding: 4px 6px; }
-    .badge { font-size: 0.72rem; padding: 3px 8px; border-radius: 99px; background: rgba(56, 189, 248, 0.16); color: #38bdf8; }
+    .panel h1 { margin: 0; font-size: 0.98rem; color: #38bdf8; letter-spacing: 0.6px; }
+    .row { display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: #94a3b8; gap: 8px; }
+    select, input[type="range"], input[type="file"] { background: #0a0f16; color: #f8fafc; border: 1px solid #2b3a4f; border-radius: 6px; padding: 4px 6px; font-size: 0.78rem; }
+    .badge { font-size: 0.7rem; padding: 3px 8px; border-radius: 99px; background: rgba(56, 189, 248, 0.16); color: #38bdf8; }
     .telemetry {
-      font-family: ui-monospace, SFMono-Regular, monospace; font-size: 0.74rem; color: #cbd5e1;
-      background: rgba(7, 11, 18, 0.75); border: 1px solid #1e293b; border-radius: 8px; padding: 8px; line-height: 1.5;
+      font-family: ui-monospace, SFMono-Regular, monospace; font-size: 0.72rem; color: #cbd5e1;
+      background: rgba(7, 11, 18, 0.82); border: 1px solid #1e293b; border-radius: 8px; padding: 8px; line-height: 1.45; white-space: pre-wrap;
     }
   </style>
 </head>
 <body>
   <canvas id="viewport"></canvas>
   <div class="panel">
-    <h1>Leonida / XenonRecomp Asset Inspector</h1>
-    <div class="row"><span>Shader Profile</span><span class="badge">GLSL 450 &rarr; SPIR-V / 2GB VRAM</span></div>
+    <h1>Leonida / XenonRecomp 3D &amp; SPIR-V Inspector</h1>
+    <div class="row"><span>Shader Target</span><span class="badge">SPIR-V 1.3 (0x07230203) &bull; 2GB VRAM</span></div>
     <div class="row">
-      <label for="asset-select">Inspect Asset</label>
+      <label for="asset-select">Built-in Asset</label>
       <select id="asset-select">
         <option value="rifle">VX-47 Assault Rifle</option>
         <option value="railgun">XR-9 Railgun</option>
@@ -40,26 +40,43 @@
       </select>
     </div>
     <div class="row">
-      <label for="rough-slider">PBR Roughness</label>
+      <label for="mode-select">Render Mode</label>
+      <select id="mode-select">
+        <option value="pbr">PBR Fresnel Shader</option>
+        <option value="wireframe">Wireframe Topology</option>
+        <option value="normals">World Normals Debug</option>
+      </select>
+    </div>
+    <div class="row">
+      <label for="file-upload">Load .OBJ / Manifest</label>
+      <input id="file-upload" type="file" accept=".obj,.json" />
+    </div>
+    <div class="row">
+      <label for="rough-slider">uRoughness</label>
       <input id="rough-slider" type="range" min="0.08" max="1" step="0.02" value="0.34" />
     </div>
     <div class="row">
-      <label for="metal-slider">PBR Metallic</label>
+      <label for="metal-slider">uMetallic</label>
       <input id="metal-slider" type="range" min="0" max="1" step="0.02" value="0.78" />
     </div>
     <div class="row">
-      <label for="wire-toggle">Wireframe Topology</label>
-      <input id="wire-toggle" type="checkbox" />
+      <label for="rim-slider">uRimStrength</label>
+      <input id="rim-slider" type="range" min="0" max="1" step="0.05" value="0.35" />
+    </div>
+    <div class="row">
+      <label for="sun-slider">uSunIntensity</label>
+      <input id="sun-slider" type="range" min="0.2" max="3.0" step="0.1" value="2.0" />
     </div>
     <div class="telemetry" id="telemetry-box"></div>
+    <div class="telemetry" id="uniform-box"></div>
   </div>
 
   <script type="module">
     import * as THREE from 'https://unpkg.com/three@0.170.0/build/three.module.js';
 
     const canvas = document.getElementById('viewport');
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.15;
@@ -73,9 +90,9 @@
     const sun = new THREE.DirectionalLight(0xffebd2, 2.0);
     sun.position.set(5, 8, 6);
     scene.add(sun);
-    const rim = new THREE.DirectionalLight(0x38bdf8, 0.9);
-    rim.position.set(-5, 3, -5);
-    scene.add(rim);
+    const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.9);
+    rimLight.position.set(-5, 3, -5);
+    scene.add(rimLight);
 
     const grid = new THREE.GridHelper(16, 16, 0x38bdf8, 0x1e293b);
     grid.position.y = -0.9;
@@ -84,19 +101,75 @@
     const primaryMat = new THREE.MeshStandardMaterial({ color: 0x303b4a, roughness: 0.34, metalness: 0.78 });
     const darkMat = new THREE.MeshStandardMaterial({ color: 0x141922, roughness: 0.72, metalness: 0.25 });
     const accentMat = new THREE.MeshStandardMaterial({ color: 0x22d3ee, emissive: 0x22d3ee, emissiveIntensity: 2.2 });
+    const normalMat = new THREE.MeshNormalMaterial();
 
     const SPECS = {
       rifle: 'VX-47 Assault Rifle\nMuzzle Vel: 120 m/s | Drop: 9.81 m/s²\nDMG: 24 (Head 2.2x = 52.8) | Mag: 30/150',
       railgun: 'XR-9 Railgun\nMuzzle Vel: 260 m/s | Drop: 3.20 m/s²\nDMG: 68 (Head 2.2x = 149.6) | Mag: 6/30',
       shotgun: 'M-12 Heavy Shotgun\nMuzzle Vel: 95 m/s | Pellets: 6\nDMG: 14x6 (Head 2.2x) | Mag: 8/40',
-      tower: 'Armored Overwatch Guard Tower\nPreset: overwatch_alloy | 3.6x5.8x3.6m\nRole: Corner Vertical Sightline & Beacon',
+      tower: 'Armored Overwatch Guard Tower\nPreset: overwatch_alloy | 4.0x4.2x4.0m\nRole: Corner Vertical Sightline & Beacon',
       bunker: 'Reinforced Ballistic Shield Bunker\nPreset: ballistic_bunker | 4.6x1.85x2.2m\nRole: Mid-Lane Cover & Firing Port'
     };
 
     let activeGroup = new THREE.Group();
     scene.add(activeGroup);
+    let currentAssetId = 'rifle';
+
+    function updateUniformReadout() {
+      const r = Number(document.getElementById('rough-slider').value).toFixed(2);
+      const m = Number(document.getElementById('metal-slider').value).toFixed(2);
+      const rim = Number(document.getElementById('rim-slider').value).toFixed(2);
+      const s = Number(document.getElementById('sun-slider').value).toFixed(1);
+      rimLight.intensity = Number(rim) * 2.6;
+      sun.intensity = Number(s);
+      document.getElementById('uniform-box').textContent =
+        `// layout(push_constant) BattlefieldMaterialPush (48B)\n` +
+        `sunDirIntensity = vec4(0.42, 0.72, 0.55, ${s})\n` +
+        `roughness       = ${r}\n` +
+        `metallic        = ${m}\n` +
+        `rimStrength     = ${rim}\n` +
+        `vramBudgetSafe  = true (<= 2048 MB)`;
+    }
+
+    function applyRenderMode() {
+      const mode = document.getElementById('mode-select').value;
+      const isWire = mode === 'wireframe';
+      const isNorm = mode === 'normals';
+      primaryMat.wireframe = isWire;
+      darkMat.wireframe = isWire;
+      accentMat.wireframe = isWire;
+      activeGroup.traverse((c) => {
+        if (!c.isMesh) return;
+        if (!c.userData.origMat) c.userData.origMat = c.material;
+        c.material = isNorm ? normalMat : c.userData.origMat;
+      });
+    }
+
+    function parseSimpleObj(text) {
+      const verts = [];
+      const positions = [];
+      for (const line of text.split(/\r?\n/)) {
+        const parts = line.trim().split(/\s+/);
+        if (parts[0] === 'v' && parts.length >= 4) {
+          verts.push([Number(parts[1]), Number(parts[2]), Number(parts[3])]);
+        } else if (parts[0] === 'f' && parts.length >= 4) {
+          const idx = parts.slice(1).map((tok) => parseInt(tok.split('/')[0], 10) - 1);
+          for (let i = 1; i + 1 < idx.length; i++) {
+            for (const k of [idx[0], idx[i], idx[i + 1]]) {
+              if (verts[k]) positions.push(...verts[k]);
+            }
+          }
+        }
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geo.computeVertexNormals();
+      geo.center();
+      return geo;
+    }
 
     function buildAsset(id) {
+      currentAssetId = id;
       scene.remove(activeGroup);
       activeGroup = new THREE.Group();
       const accentHex = id === 'railgun' ? 0xc084fc : (id === 'shotgun' ? 0xfb923c : 0x22d3ee);
@@ -150,17 +223,43 @@
         camera.position.set(0, 1.0, 3.6);
       }
       scene.add(activeGroup);
+      applyRenderMode();
       document.getElementById('telemetry-box').textContent = SPECS[id];
     }
 
-    buildAsset('rifle');
-    document.getElementById('asset-select').addEventListener('change', (e) => buildAsset(e.target.value));
-    document.getElementById('rough-slider').addEventListener('input', (e) => { primaryMat.roughness = Number(e.target.value); });
-    document.getElementById('metal-slider').addEventListener('input', (e) => { primaryMat.metalness = Number(e.target.value); });
-    document.getElementById('wire-toggle').addEventListener('change', (e) => {
-      primaryMat.wireframe = e.target.checked;
-      darkMat.wireframe = e.target.checked;
+    document.getElementById('file-upload').addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      if (file.name.endsWith('.obj')) {
+        scene.remove(activeGroup);
+        activeGroup = new THREE.Group();
+        const geo = parseSimpleObj(text);
+        const mesh = new THREE.Mesh(geo, primaryMat);
+        activeGroup.add(mesh);
+        scene.add(activeGroup);
+        applyRenderMode();
+        document.getElementById('telemetry-box').textContent = `Loaded OBJ: ${file.name}\nVertices: ${geo.attributes.position.count}`;
+      } else if (file.name.endsWith('.json')) {
+        try {
+          const parsed = JSON.parse(text);
+          document.getElementById('telemetry-box').textContent =
+            `Loaded Manifest: ${file.name}\nArchive: ${parsed.source_archive || parsed.title || 'custom'}\n` +
+            `Textures: ${(parsed.textures || []).length} | Meshes: ${(parsed.meshes || []).length}`;
+        } catch {
+          document.getElementById('telemetry-box').textContent = `Invalid JSON manifest: ${file.name}`;
+        }
+      }
     });
+
+    buildAsset('rifle');
+    updateUniformReadout();
+    document.getElementById('asset-select').addEventListener('change', (e) => buildAsset(e.target.value));
+    document.getElementById('mode-select').addEventListener('change', applyRenderMode);
+    document.getElementById('rough-slider').addEventListener('input', (e) => { primaryMat.roughness = Number(e.target.value); updateUniformReadout(); });
+    document.getElementById('metal-slider').addEventListener('input', (e) => { primaryMat.metalness = Number(e.target.value); updateUniformReadout(); });
+    document.getElementById('rim-slider').addEventListener('input', updateUniformReadout);
+    document.getElementById('sun-slider').addEventListener('input', updateUniformReadout);
 
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
@@ -170,7 +269,7 @@
 
     function animate() {
       requestAnimationFrame(animate);
-      activeGroup.rotation.y += 0.009;
+      activeGroup.rotation.y += 0.008;
       camera.lookAt(0, 0.25, 0);
       renderer.render(scene, camera);
     }

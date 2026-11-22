@@ -17,6 +17,8 @@ namespace static_recomp {
 
 namespace {
 
+constexpr uint32_t kSpirvMagic = 0x07230203u;
+
 #ifdef _WIN32
 struct RawXInputGamepad {
     uint16_t wButtons;
@@ -82,6 +84,98 @@ LRESULT CALLBACK StaticRecompWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM 
 
 } // namespace
 
+// --- MemoryMappedContext (Leonida Page Directory + XenonRecomp Endian Accessors) ---
+bool MemoryMappedContext::Initialize(uint64_t baseAddr, uint32_t sizeMB) {
+    guestBaseAddress = baseAddr;
+    const uint64_t totalBytes = static_cast<uint64_t>(std::max<uint32_t>(4, sizeMB)) * 1024ULL * 1024ULL;
+    guestRam.assign(static_cast<size_t>(totalBytes), 0);
+    pageDirectory.clear();
+
+    const uint64_t numPages = totalBytes / pageSize;
+    pageDirectory.reserve(static_cast<size_t>(numPages));
+    for (uint64_t p = 0; p < numPages; ++p) {
+        pageDirectory[(baseAddr / pageSize) + p] = p * pageSize;
+    }
+    return true;
+}
+
+uint8_t* MemoryMappedContext::GuestToHost(uint64_t guestAddr) {
+    const uint64_t pageIdx = guestAddr / pageSize;
+    const uint64_t pageOff = guestAddr % pageSize;
+    auto it = pageDirectory.find(pageIdx);
+    if (it == pageDirectory.end()) {
+        return nullptr;
+    }
+    const uint64_t hostOff = it->second + pageOff;
+    if (hostOff >= guestRam.size()) {
+        return nullptr;
+    }
+    return guestRam.data() + hostOff;
+}
+
+const uint8_t* MemoryMappedContext::GuestToHost(uint64_t guestAddr) const {
+    const uint64_t pageIdx = guestAddr / pageSize;
+    const uint64_t pageOff = guestAddr % pageSize;
+    auto it = pageDirectory.find(pageIdx);
+    if (it == pageDirectory.end()) {
+        return nullptr;
+    }
+    const uint64_t hostOff = it->second + pageOff;
+    if (hostOff >= guestRam.size()) {
+        return nullptr;
+    }
+    return guestRam.data() + hostOff;
+}
+
+uint32_t MemoryMappedContext::ReadBE32(uint64_t guestAddr) const {
+    const uint8_t* ptr = GuestToHost(guestAddr);
+    if (!ptr || (ptr + 4) > (guestRam.data() + guestRam.size())) {
+        return 0;
+    }
+    return (static_cast<uint32_t>(ptr[0]) << 24) |
+           (static_cast<uint32_t>(ptr[1]) << 16) |
+           (static_cast<uint32_t>(ptr[2]) << 8) |
+           static_cast<uint32_t>(ptr[3]);
+}
+
+void MemoryMappedContext::WriteBE32(uint64_t guestAddr, uint32_t value) {
+    uint8_t* ptr = GuestToHost(guestAddr);
+    if (!ptr || (ptr + 4) > (guestRam.data() + guestRam.size())) {
+        return;
+    }
+    ptr[0] = static_cast<uint8_t>((value >> 24) & 0xFF);
+    ptr[1] = static_cast<uint8_t>((value >> 16) & 0xFF);
+    ptr[2] = static_cast<uint8_t>((value >> 8) & 0xFF);
+    ptr[3] = static_cast<uint8_t>(value & 0xFF);
+}
+
+uint32_t MemoryMappedContext::ReadLE32(uint64_t guestAddr) const {
+    const uint8_t* ptr = GuestToHost(guestAddr);
+    if (!ptr || (ptr + 4) > (guestRam.data() + guestRam.size())) {
+        return 0;
+    }
+    return static_cast<uint32_t>(ptr[0]) |
+           (static_cast<uint32_t>(ptr[1]) << 8) |
+           (static_cast<uint32_t>(ptr[2]) << 16) |
+           (static_cast<uint32_t>(ptr[3]) << 24);
+}
+
+void MemoryMappedContext::WriteLE32(uint64_t guestAddr, uint32_t value) {
+    uint8_t* ptr = GuestToHost(guestAddr);
+    if (!ptr || (ptr + 4) > (guestRam.data() + guestRam.size())) {
+        return;
+    }
+    ptr[0] = static_cast<uint8_t>(value & 0xFF);
+    ptr[1] = static_cast<uint8_t>((value >> 8) & 0xFF);
+    ptr[2] = static_cast<uint8_t>((value >> 16) & 0xFF);
+    ptr[3] = static_cast<uint8_t>((value >> 24) & 0xFF);
+}
+
+void MemoryMappedContext::Shutdown() {
+    pageDirectory.clear();
+    guestRam.clear();
+}
+
 // --- VramBudgetManager ---
 void VramBudgetManager::Configure(uint32_t vramBudgetMB, uint32_t stagingMB) {
     budgetBytes = static_cast<uint64_t>(std::max<uint32_t>(512, vramBudgetMB)) * 1024ULL * 1024ULL;
@@ -121,18 +215,38 @@ double VramBudgetManager::UtilizationPercent() const {
     return (static_cast<double>(TotalAllocatedBytes()) / static_cast<double>(budgetBytes)) * 100.0;
 }
 
-// --- AudioBridge ---
-bool AudioBridge::Initialize() {
+// --- AudioBridge (Real-Time Stereo 48kHz PCM Mixer) ---
+bool AudioBridge::Initialize(uint32_t ringFrames) {
+    mixRingBuffer.assign(static_cast<size_t>(ringFrames) * channels, 0);
+    mixedFrames = 0;
     initialized = true;
     return true;
 }
 
+void AudioBridge::MixStereoVoice(const int16_t* samples, uint32_t frameCount, float gain) {
+    if (!initialized || !samples || mixRingBuffer.empty()) {
+        return;
+    }
+    const size_t maxSamples = std::min<size_t>(mixRingBuffer.size(), static_cast<size_t>(frameCount) * channels);
+    const float effectiveGain = std::clamp(gain * masterGain, 0.0f, 2.0f);
+    for (size_t i = 0; i < maxSamples; ++i) {
+        const float mixed = static_cast<float>(mixRingBuffer[i]) + static_cast<float>(samples[i]) * effectiveGain;
+        const float clamped = std::clamp(mixed, -32767.0f, 32767.0f);
+        mixRingBuffer[i] = static_cast<int16_t>(clamped);
+    }
+    mixedFrames += frameCount;
+}
+
 void AudioBridge::SubmitPcmFrame(const int16_t* samples, uint32_t frameCount) {
-    (void)samples;
-    (void)frameCount;
+    MixStereoVoice(samples, frameCount, 1.0f);
+}
+
+void AudioBridge::ClearMixBuffer() {
+    std::fill(mixRingBuffer.begin(), mixRingBuffer.end(), 0);
 }
 
 void AudioBridge::Shutdown() {
+    mixRingBuffer.clear();
     initialized = false;
 }
 
@@ -142,6 +256,8 @@ bool VulkanRHI::Initialize(const RuntimeConfig& config, void* nativeWindowHandle
     swapchainWidth = config.width;
     swapchainHeight = config.height;
     swapchainImageCount = (config.vramBudgetMB <= 2048) ? 2u : 3u;
+    loadedShaders.clear();
+    pipelineCache.clear();
 
     // Reserve double-buffered swapchain + depth + staging pool from VRAM budget
     const uint64_t colorBytes = static_cast<uint64_t>(swapchainWidth) * swapchainHeight * 4ULL * swapchainImageCount;
@@ -173,11 +289,48 @@ bool VulkanRHI::Initialize(const RuntimeConfig& config, void* nativeWindowHandle
         swapchainReady = false;
     }
 
+    // Register baseline Battlefield PBR pipeline state
+    VulkanPipelineState defaultPbr;
+    defaultPbr.name = "Battlefield_PBR_Pipeline";
+    defaultPbr.vertexShader = "battlefield_pbr_vert.spv";
+    defaultPbr.fragmentShader = "battlefield_pbr_frag.spv";
+    defaultPbr.pushConstantBytes = 48;
+    RegisterPipelineState(defaultPbr);
+
+    return true;
+}
+
+SpirvModuleInfo VulkanRHI::LoadSpirvModule(const std::string& name, const std::vector<uint8_t>& spirvBytes) {
+    SpirvModuleInfo info;
+    info.name = name;
+    info.byteSize = spirvBytes.size();
+    if (spirvBytes.size() >= 20 && (spirvBytes.size() % 4) == 0) {
+        uint32_t magic = 0;
+        uint32_t version = 0;
+        uint32_t bound = 0;
+        std::memcpy(&magic, spirvBytes.data(), 4);
+        std::memcpy(&version, spirvBytes.data() + 4, 4);
+        std::memcpy(&bound, spirvBytes.data() + 12, 4);
+        if (magic == kSpirvMagic && bound > 0) {
+            info.version = version;
+            info.boundIds = bound;
+            info.valid = true;
+            loadedShaders.push_back(info);
+        }
+    }
+    return info;
+}
+
+bool VulkanRHI::RegisterPipelineState(const VulkanPipelineState& state) {
+    if (state.pushConstantBytes > 128) {
+        return false; // Enforce Vulkan minimum spec / 2GB GPU limit
+    }
+    pipelineCache.push_back(state);
     return true;
 }
 
 void VulkanRHI::BeginFrame() {
-    // Frame command buffer reset & swapchain image acquire hook
+    // Swapchain image acquire & command buffer begin hook
 }
 
 void VulkanRHI::EndFrame() {
@@ -185,6 +338,8 @@ void VulkanRHI::EndFrame() {
 }
 
 void VulkanRHI::Shutdown() {
+    loadedShaders.clear();
+    pipelineCache.clear();
     vram.ReleaseAll();
     swapchainReady = false;
     loaderAvailable = false;
@@ -222,16 +377,19 @@ bool NativeRuntime::Initialize(const RuntimeConfig& config) {
     }
 #endif
 
-    audio_.Initialize();
+    memory_.Initialize(0x80000000ULL, config_.guestRamMB);
+    audio_.Initialize(2048);
     rhi_.Initialize(config_, nativeWindow_);
     initialized_ = true;
 
     std::cout << "[Runtime] Initialized (" << rhi_.deviceName << ")\n"
               << "[Runtime] Resolution: " << config_.width << "x" << config_.height
               << " @ " << config_.targetFps << " FPS target\n"
+              << "[Runtime] Guest RAM: " << config_.guestRamMB << " MB (" << memory_.pageDirectory.size() << " mapped 4KB pages)\n"
               << "[Runtime] VRAM Budget: " << config_.vramBudgetMB << " MB (MaxTex="
               << rhi_.vram.maxTextureDimension << "px, Used="
-              << (rhi_.vram.TotalAllocatedBytes() / (1024ULL * 1024ULL)) << " MB)\n";
+              << (rhi_.vram.TotalAllocatedBytes() / (1024ULL * 1024ULL)) << " MB, Pipelines="
+              << rhi_.pipelineCache.size() << ")\n";
     return true;
 }
 
@@ -345,7 +503,37 @@ void NativeRuntime::PollInput() {
     PollXInput();
 }
 
+VirtualPadState NativeRuntime::TranslateToVirtualPad() const {
+    VirtualPadState pad{};
+    if (input_.gamepadConnected) {
+        pad.moveX = input_.leftStickX;
+        pad.moveY = input_.leftStickY;
+        pad.lookX = input_.rightStickX;
+        pad.lookY = input_.rightStickY;
+        pad.triggerL = input_.leftTrigger;
+        pad.triggerR = input_.rightTrigger;
+        pad.buttonsMask = input_.gamepadButtons;
+        return pad;
+    }
+
+    // Native Win64 Keyboard & Mouse -> Console VirtualPad translation
+    if (input_.keys['A']) pad.moveX -= 1.0f;
+    if (input_.keys['D']) pad.moveX += 1.0f;
+    if (input_.keys['W']) pad.moveY += 1.0f;
+    if (input_.keys['S']) pad.moveY -= 1.0f;
+    pad.lookX = std::clamp(input_.mouseDeltaX * 0.05f, -1.0f, 1.0f);
+    pad.lookY = std::clamp(input_.mouseDeltaY * 0.05f, -1.0f, 1.0f);
+    pad.triggerL = input_.mouseRight ? 1.0f : 0.0f;
+    pad.triggerR = input_.mouseLeft ? 1.0f : 0.0f;
+    if (input_.keys[' ']) pad.buttonsMask |= (1u << 0); // Jump / A
+    if (input_.keys['C']) pad.buttonsMask |= (1u << 1); // Crouch / B
+    if (input_.keys['R']) pad.buttonsMask |= (1u << 2); // Reload / X
+    if (input_.keys['E']) pad.buttonsMask |= (1u << 3); // Interact / Y
+    return pad;
+}
+
 void NativeRuntime::BeginFrame() {
+    audio_.ClearMixBuffer();
     rhi_.BeginFrame();
 }
 
@@ -353,7 +541,6 @@ void NativeRuntime::EndFrame() {
     rhi_.EndFrame();
     ++frameIndex_;
 
-    // Lightweight frame pacing for high-FPS targets
     const double targetMs = 1000.0 / static_cast<double>(std::max<uint32_t>(30, config_.targetFps));
     lastFrameMs_ = targetMs;
     if (!config_.headless) {
@@ -367,6 +554,7 @@ void NativeRuntime::Shutdown() {
     }
     rhi_.Shutdown();
     audio_.Shutdown();
+    memory_.Shutdown();
     DestroyWindow();
 #ifdef _WIN32
     if (xinputModule_) {

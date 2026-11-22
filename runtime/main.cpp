@@ -1,6 +1,7 @@
 #include "NativeRuntime.h"
 #include "RecompStubs.h"
 
+#include <array>
 #include <cstdlib>
 #include <iostream>
 #include <string>
@@ -28,17 +29,31 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    // Bind memory-mapped guest execution context and verify big-endian read/write
+    auto& mem = runtime.GetMemoryContext();
+    mem.WriteBE32(0x80000100ULL, 0xCAFEBABEu);
+    const uint32_t readBack = mem.ReadBE32(0x80000100ULL);
+    if (readBack != 0xCAFEBABEu) {
+        std::cerr << "[Main] MemoryMappedContext endianness self-check failed.\n";
+        return 1;
+    }
+
     auto dispatch = static_recomp::BuildDispatchTable();
     static_recomp::RecompContext ctx{};
+    ctx.rdram = mem.GuestToHost(0x80000000ULL);
     if (auto it = dispatch.find(static_recomp::kEntryPoint); it != dispatch.end() && it->second) {
         it->second(ctx);
         std::cout << "[Recomp] Executed entry stub @ 0x" << std::hex << ctx.pc << std::dec
                   << " (dispatch table entries: " << dispatch.size() << ")\n";
     }
 
+    std::array<int16_t, 64> silencePcm{};
     while (runtime.PumpEvents()) {
         runtime.PollInput();
+        const auto pad = runtime.TranslateToVirtualPad();
+        (void)pad;
         runtime.BeginFrame();
+        runtime.GetAudioBridge().SubmitPcmFrame(silencePcm.data(), 32);
         runtime.EndFrame();
 
         if (maxFrames > 0 && runtime.GetFrameIndex() >= maxFrames) {
@@ -46,7 +61,8 @@ int main(int argc, char** argv) {
         }
     }
 
-    std::cout << "[Main] Clean shutdown after " << runtime.GetFrameIndex() << " frames.\n";
+    std::cout << "[Main] Clean shutdown after " << runtime.GetFrameIndex()
+              << " frames (audio mixed frames: " << runtime.GetAudioBridge().mixedFrames << ").\n";
     runtime.Shutdown();
     return 0;
 }
