@@ -5,11 +5,12 @@ A modular **C++20 / Python** Static Recompilation pipeline inspired by **Leonida
 ## End-to-End Pipeline
 
 ```
-Console Binary (.xex / .z64 / .elf)
+Console Binary / Archive (.rpf / .xex / .z64 / .elf)
   ├──► tools/recomp_pipeline.py     (Header & Section Parser → generated_code/ C++20 Stubs)
-  ├──► shaders/spirv_translator.py  (Shader Microcode → GLSL 450 / SPIR-V Validation)
+  ├──► tools/archive_unpacker.py    (RPF7/8, XEX2, Z64 Unpacker → meshes/textures/ui/audio)
+  ├──► shaders/spirv_translator.py  (DXBC/DXIL/RDNA2/GLSL 450 → Vulkan SPIR-V 1.3 .spv)
   ├──► assets/asset_inspector.py    (Texture/Mesh Inspection & 2GB VRAM Budget Audit)
-  └──► runtime/NativeRuntime.*      (Win32 Windowing, XInput/KBM, Audio, Vulkan RHI)
+  └──► runtime/NativeRuntime.*      (Memory-Mapped Context, Win32, XInput/KBM, PCM Audio, Vulkan RHI)
              │
              ▼
     CMake + MSVC (GitHub Actions: windows-latest)
